@@ -1,0 +1,63 @@
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+.expo-export-smoke-*/
+
+# Native
+*.orig.*
+*.jks
+*.keystore
+*.p8
+*.p12
+*.key
+*.mobileprovision
+GoogleService-Info.plist
+android/app/build/
+ios/build/
+build/
+
+# Store build artifacts
+*.aab
+*.apk
+*.ipa
+.eas/
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env*.local
+.env
+
+# typescript
+*.tsbuildinfo
+
+# coverage
+coverage/
+
+# legacy backup (구버전 + 제거된 Convex 코드)
+_legacy/
+
+# store credentials
+play-service-account.json
+google-services.json
+
+# playwright
+playwright-report/
+test-results/
