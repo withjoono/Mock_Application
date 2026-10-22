@@ -30,6 +30,9 @@
       "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_ENV": "production"
+      },
+      "ios": {
+        "image": "macos-sequoia-15.6-xcode-26.2"
       }
     }
   },
@@ -40,7 +43,7 @@
         "track": "internal"
       },
       "ios": {
-        "appleId": "geobukacademy@gmail.com",
+        "appleId": "withjoono@gmail.com",
         "ascAppId": "6812627982"
       }
     }

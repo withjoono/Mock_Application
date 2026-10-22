@@ -126,6 +126,8 @@ export interface IDistributionBin {
 /** GET /mock-application/stats 응답 */
 export interface IMaStats {
   open: boolean;
+  /** 비로그인 점수를 저장하지 않고 계산한 미리보기인지 여부 */
+  preview?: boolean;
   resultOpenAt?: string;
   /** 통계의 모집인원·충원 이력 기준 학년도 */
   dataYear?: number;

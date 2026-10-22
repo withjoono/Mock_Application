@@ -5,37 +5,22 @@
 ## 1. 저장소 & 프로드 배포
 
 **저장소 구조**: Hub는 허브 역할만, 각 위성앱은 별도 저장소. 이 앱의 저장소는 `withjoono/Mock_Application`.
-(샌드박스에서 git init 시 메타데이터가 손상되어 저장소 초기화는 PC에서 직접 실행해야 함)
 
-### 1-A. Mock_Application 저장소 초기화 + push (PC에서)
+### 1-A. Mock_Application 저장소 초기화 + push — 완료
 
-```bash
-cd E:\Dev\github\Mock_Application
-git init -b main
-git remote add origin https://github.com/withjoono/Mock_Application.git
-git add -A
-git commit -m "feat: T 모지 v1.0 — 시즌 기반 모의지원 (수시 6회 / 모평·정시 가나다 3회)"
-git push -u origin main
-```
-
-(_legacy/, node_modules/, 스토어 키 파일은 .gitignore 처리되어 있음)
+2026-10-08 `main` 최초 커밋 및 `https://github.com/withjoono/Mock_Application.git` push 완료. `_legacy/`, `node_modules/`, 환경 파일, 스토어 키와 빌드 산출물은 `.gitignore` 처리됨.
 
 ### 1-B. Hub-Backend 배포 (ma_* API + 탈퇴 + 개인정보처리방침 페이지)
 
-기존 `ma_*` 모듈과 탈퇴 API는 2026-10-05 프로드 배포가 확인됐습니다. 이번에 추가한 실제 경쟁률·내 순위·최초합/예상 추합 순위, `susi.susi_unit` 검색 전환, 6·9월 모평 시즌 연장은 아직 로컬 변경이므로 별도 배포가 필요합니다. Hub 현재 작업트리에는 다른 미완 변경이 함께 있으므로 아래 예전 일괄 `git add` 명령을 그대로 실행하지 말고 T모지 관련 파일만 분리해 배포합니다.
+2026-10-08 Hub `main`의 `525b6d5`로 실제 경쟁률·내 순위·최초합/예상 추합 순위, `susi.susi_unit` 검색 전환, 시즌 운영 설정 및 개인정보처리방침을 배포했습니다.
 
 2026-10-08 프로드 읽기 전용 실측(Cloud SQL Proxy 15432 + 신원 게이트): PostgreSQL 14.23/Linux, `susi_calculation_formula=1,267`, `susi_unit=33,770`, `ma_susi_application=0`, `ma_jungsi_application=0`. 정시 `js_admission`은 2026학년도 5,176행만 있고 2027행은 아직 없습니다. 따라서 서버는 시즌 학년도 이하의 최신 자료(현재 2026)를 선택하고 `target_data_year`에 저장하며, 앱에도 `2026학년도 자료`라고 명시합니다. 2027 데이터가 적재되면 별도 코드 변경 없이 2027 자료를 우선 사용합니다.
 
-배포는 GitHub Actions가 자동 처리합니다 (`.github/workflows/deploy-backend.yml`).
-main에 push하면: yarn install(→prisma generate 자동) → build → **Cloud SQL 프록시로 `prisma migrate deploy` 자동 실행**(ma_* 테이블 + 2027 시즌 시드 생성) → App Engine 배포. Hub-Frontend 변경(`public/tmoji-privacy.html`)은 별도 frontend workflow가 Firebase Hosting에 배포.
+배포 결과: Prisma migration 및 전체 schema drift 검사 성공, App Engine `default` 버전 `20261008t083432` 배포 성공, Firebase Hosting 배포 성공, production smoke 11개 통과. 정책 URL은 HTTP 200이며 `성명: 강준호`가 반영되고 `[대표자명]`은 제거됐습니다.
 
-```bash
-cd E:\Dev\github\Hub
-git add Hub-Backend/prisma Hub-Backend/src/modules/mock-application Hub-Backend/src/modules/account Hub-Backend/src/app.module.ts Hub-Frontend/public/tmoji-privacy.html CLAUDE.md
-git commit -m "feat: 모의지원(ma_*) 모듈 + 셀프 회원탈퇴 + T모지 개인정보처리방침"
-git push origin main
-# 진행 확인: gh run watch -R withjoono/Hub
-```
+2026-10-21 App Review 2.1 거절 대응: 프로덕션 `/mock-application/seasons`가 빈 배열을 반환하는 것을 재현했습니다. 과거 스키마 복구 과정에서 최초 시즌 마이그레이션은 적용 완료로 기록됐지만 시드 행이 누락됐고, 10월 8일 마이그레이션은 기존 행만 갱신해 복구하지 못한 것이 원인이었습니다. Hub `main`의 `afaf15e`가 네 시즌을 멱등 upsert했고, `a9a6f54`는 종료된 2027학년도 6·9월 모평을 일반 사용자에게 다시 닫고 Apple 심사용 계정에만 9월 시즌 접근을 허용했습니다. 후속 `dc38235`는 이 예외를 현재 심사용 2027학년도 9월 시즌으로만 제한해 향후 2028학년도 시즌에 영향을 주지 않게 했습니다. App Engine `default` 버전 `20261021t052707` 배포 로그에서 PostgreSQL 14.23/Linux, `susi_calculation_formula=1,267`, `susi_unit=33,770` 신원 게이트, 전체 schema drift 및 공용 DB 연결 예산 검사를 통과했습니다. 심사용 계정 실측으로 6월 `isOpen=false`, 9월 `isOpen=true`(심사 전용), 정시 모집단위 검색 30건, 지원 생성→조회→취소를 확인했으며 테스트 지원서는 즉시 삭제했습니다. 일반 계정의 종료 시즌 비공개 및 미래 학년도 예외 차단은 단위 테스트로 검증했습니다.
+
+2026-10-22 App Review 5.1.1(v) / 2.3.3 재심사 대응: 계정 없이도 시즌 선택 → 대학·모집단위 검색 → 점수 입력 → 경쟁률·예상 내 순위·최초합 순위·예상 추합 순위를 조회하는 체험 흐름을 추가했습니다. 익명 입력은 서버에 저장하지 않고, 지원서 저장·취소·내 내역만 로그인을 요구합니다. Hub `523c20d`가 프로덕션에 배포됐고, Actions의 빌드·마이그레이션·schema drift·App Engine·CORS 검사가 모두 통과했습니다. 프로덕션 익명 API 실측으로 시즌 4개, 수시/정시 검색 각 30건, 저장 없는 합격예측 200 응답을 확인했습니다.
 
 ### 배포 후 검증 시나리오 (prod)
 
@@ -44,7 +29,7 @@ BASE=https://ts-back-nest-479305.du.r.appspot.com
 # 1) 로그인 → 토큰 획득
 curl -s -X POST $BASE/auth/login/email -H 'Content-Type: application/json' \
   -d '{"email":"<테스트계정>","password":"<비밀번호>"}'
-# 2) 시즌 목록 (6·9월 모평 시즌이 isOpen=true로 나와야 함)
+# 2) 시즌 목록 (일반 계정은 종료 시즌 false, Apple 심사용 계정만 9월 true)
 curl -s $BASE/mock-application/seasons -H "Authorization: Bearer $TOKEN"
 # 3) 검색 (susi/jungsi 실데이터 조인 확인)
 curl -s "$BASE/mock-application/search/jungsi?keyword=%EC%84%9C%EC%9A%B8&season_id=<시즌ID>&gun_type=%EA%B0%80" -H "Authorization: Bearer $TOKEN"
@@ -56,7 +41,7 @@ curl -s "$BASE/mock-application/search/jungsi?keyword=%EC%84%9C%EC%9A%B8&season_
 
 ## 2. 1차 출시 범위 (확정)
 
-**포함**: 로그인(이메일) → 시즌 홈 → 모의지원(수시 6슬롯 / 모평·정시 가나다 3슬롯) → 실시간 경쟁률 → 취소 → 회원 탈퇴
+**포함**: 비회원 시즌·대학 검색 및 저장 없는 합격예측 + 로그인(이메일) 후 모의지원 저장(수시 6슬롯 / 모평·정시 가나다 3슬롯) → 실시간 경쟁률 → 취소 → 회원 탈퇴
 **Convex 완전 제거됨** (관련 파일은 `_legacy/convex-removed/` 보관, `convex` 의존성 제거 — `npm install` 재실행 필요)
 **잔여 데모 화면** (StandardScoreInput, CollegeSelect, SupportStatus/Cut, Strategy, SupportStrategy, MockApply, ScoreAnalysis): `__DEV__` 게이트로 **프로덕션 빌드에서 비노출 처리 완료** (HamburgerMenu + MainScreen 폴백). 개발 빌드에서는 그대로 접근 가능. v1.1에서 실데이터 연동 후 노출 예정
 
@@ -74,16 +59,17 @@ curl -s "$BASE/mock-application/search/jungsi?keyword=%EC%84%9C%EC%9A%B8&season_
 - [x] iOS: `supportsTablet: false`, `ITSAppUsesNonExemptEncryption: false` (심사 단축)
 - [x] Android production 빌드: APK → **AAB**(Play Store 필수, buildType 제거로 기본값)
 - [x] EAS 프로필별 `EXPO_PUBLIC_ENV` 주입 → `lib/api/config.ts`가 prod URL 선택
-- [x] eas.json submit 정보 골격 (ascAppId는 App Store Connect 앱 생성 후 입력)
+- [x] EAS owner `junhokang` 웹 계정 일치 확인
+- [x] eas.json iOS 제출 정보: Apple ID `withjoono@gmail.com`, ascAppId `6812627982`
 
 ### 사용자가 직접 해야 하는 것
 - [ ] **개발자 계정**: Apple Developer($99/년), Google Play Console($25 1회) — geobukacademy@gmail.com 권장
 - [x] ~~아이콘/스플래시 교체~~ — T 모지 브랜드 아이콘 4종 생성 완료 (#0B5FFF, T 모노그램 + 가나다 3점). 더 다듬으려면 디자이너 작업으로 교체 가능
-- [ ] **개인정보처리방침 공개본 갱신** — URL은 현재 열리지만 공개본에 `[대표자명]`이 남아 있음. 로컬 `Hub-Frontend/public/tmoji-privacy.html`은 `강준호`로 수정 완료했으므로 Hub Frontend 배포 후 공개본 재확인
+- [x] **개인정보처리방침 공개본 갱신** — `https://www.tskool.kr/tmoji-privacy` HTTP 200, `성명: 강준호`, placeholder 없음
 - [ ] **데이터 안전 설문**(Play Console) / **App Privacy**(App Store Connect) 작성
-- [ ] **심사용 테스트 계정** 제공 (로그인 필수 앱이므로 양쪽 모두 요구)
-- [ ] 스크린샷 (iPhone 6.7"/6.5", Android 폰 최소 2장)
-- [x] 앱 이름 확정: **"T 모지"** / 설명: "수시/정시 무료 모의지원 앱" / 푸터: © T Skool (tskool.kr 링크)
+- [x] **심사용 테스트 계정** App Store Connect에 제공 (계정 기능 확인용; 합격예측 체험은 비회원으로도 가능)
+- [ ] 스크린샷 업로드 (iPhone 6.7"/6.5", Android 폰 최소 2장) — `docs/store-screenshots/` 에 홈·시즌·검색·예측 4장 후보 생성 완료
+- [x] 앱 이름 확정: **"T 모지"** / 설명: "수시·정시 모의지원 합격 예측" / 푸터: © T Skool (tskool.kr 링크)
 
 ### 빌드·제출 명령
 

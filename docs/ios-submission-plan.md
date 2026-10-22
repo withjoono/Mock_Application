@@ -1,18 +1,18 @@
 # T 모지 — iOS 앱스토어 제출 구현 계획
 
 > 작성: 2026-10-08 · 대상: App Store (iOS) 1차 제출
-> 상태 기준: 번들ID `kr.tskool.mockapply`, ascAppId `6812627982`, Apple ID `geobukacademy@gmail.com` (eas.json 반영 완료)
+> 상태 기준: 번들ID `kr.tskool.mockapply`, ascAppId `6812627982`, Apple ID `withjoono@gmail.com` (eas.json 반영 완료)
 
 ## 전제: 제출 전 반드시 통과해야 하는 선행 조건
 
-2026-10-08 실측 기준입니다. P1은 완료됐고, P2~P4의 남은 조치가 끝나야 제출할 수 있습니다.
+2026-10-08 실측 기준입니다. P1~P3은 완료됐고, P4는 계정 소유자 확인까지 끝났습니다. EAS CLI 인증과 프로젝트 연결만 남았습니다.
 
 | # | 상태 | 선행 조건 | 2026-10-08 확인 결과 |
 |---|------|-----------|----------------------|
 | P1 | **완료** | `npm install` + 로컬 실행 | SDK 52 의존성 정렬, TypeScript 통과, production Metro 기동, iOS·Android Hermes 번들 생성 성공 |
-| P2 | **추가 배포 필요** | Hub-Backend 프로드 배포 | 기존 `ma_*` 라우트는 이미 프로드에 배포됨. 이번 순위·경쟁률·권위 수시 검색·시즌 연장 변경은 별도 push/Actions 배포 필요 |
-| P3 | **배포 필요** | 개인정보처리방침 URL 라이브 | URL은 HTTP 200. 로컬 정책의 대표자명을 `강준호`로 수정했으나 공개본은 아직 `[대표자명]`이므로 Hub Frontend 배포 필요 |
-| P4 | **미확인** | `owner: "junhokang"`와 EAS 계정 일치 | 현재 CLI는 `Not logged in`. `eas login` 후 `eas whoami`와 프로젝트 연결 확인 필요 |
+| P2 | **완료** | Hub-Backend 프로드 배포 | Hub `525b6d5` 배포 성공. Prisma migration·schema drift 검사·App Engine 배포 성공(버전 `20261008t083432`) |
+| P3 | **완료** | 개인정보처리방침 URL 라이브 | `https://www.tskool.kr/tmoji-privacy` HTTP 200, `성명: 강준호` 확인, `[대표자명]` 없음 |
+| P4 | **계정 확인 완료 / CLI 인증 대기** | `owner: "junhokang"`와 EAS 계정 일치 | Expo 웹 계정 `junhokang` 확인. CLI용 접근 토큰 생성 또는 `eas login` 후 프로젝트 연결 필요 |
 
 P1 보완 과정에서 `expo-asset`, `expo-font`를 명시적 의존성으로 추가했고 `react-native-svg`를 SDK 52 호환 버전으로 정렬했습니다. `npm audit` 경고 65건은 남아 있으나, 자동 강제 수정은 Expo/RN 주버전을 깨뜨리므로 적용하지 않습니다.
 
@@ -70,7 +70,7 @@ eas submit --platform ios --profile production
 | 항목 | 값/가이드 |
 |------|-----------|
 | 연령 등급 | 폭력·성·도박 없음 → **4+** 예상. 설문은 전부 "없음"/"아니오" |
-| 개인정보처리방침 URL | https://www.tskool.kr/tmoji-privacy.html (P3 라이브 후) |
+| 개인정보처리방침 URL | https://www.tskool.kr/tmoji-privacy (HTTP 200 확인) |
 | App Privacy (데이터 수집) | 수집함: **연락처 정보**(이메일·이름·전화 = 계정), **사용자 콘텐츠**(성적 입력값·지원 내역), **식별자**(계정 ID). 용도: 앱 기능. 제3자 공유 없음. 추적(ATT) 없음 |
 | 콘텐츠 권리 | 제3자 콘텐츠 없음 → "아니오" |
 | 수출 규정(암호화) | HTTPS 표준 암호화만 사용 → 면제. `ITSAppUsesNonExemptEncryption: false` 이미 Info.plist에 설정됨 |
@@ -100,12 +100,11 @@ P2(백엔드 배포) 후 production 또는 preview 빌드로 아래 전 항목 �
 - 스모크 테스트에서 나온 버그 수정
 - 스크린샷용 화면 구성·문구 다듬기
 
-**사용자만 할 수 있는 것** (계정/빌드/입력):
-- P1 `npm install`·로컬 실행, P2 `git push`(배포), P3 정책 배포, P4 EAS 계정 확인
-- `eas build`/`eas submit` 실행 (Apple 인증)
+**사용자만 할 수 있는 것** (계정/입력):
+- Expo/Apple/Google의 비밀번호·2단계 인증 입력
 - App Store Connect 폼 입력(심사정보·앱정보·App Privacy·스크린샷 업로드)
 - 심사용 테스트 계정 생성
 
 ## 권장 실행 순서
 
-P1 로컬 실행 → P2 백엔드 배포 → P4 EAS 계정 확인 → 5번 기능 검증(dev) → P3 정책 배포 → 1번 production 빌드/submit → 2번 스크린샷 → 3·4번 ASC 폼 입력 → 앱 버전 제출
+EAS CLI 인증·프로젝트 연결 → 5번 실계정 기능 검증 → production 빌드/submit → 스크린샷 → ASC/Play Console 폼 입력 → 앱 버전 제출

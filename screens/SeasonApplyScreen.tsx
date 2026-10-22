@@ -19,6 +19,7 @@ import theme from '../lib/theme';
 import AppHeader from '../components/AppHeader';
 import AppFooter from '../components/AppFooter';
 import { useMockApplication } from '../lib/hooks/useMockApplication';
+import { useAuthContext } from '../lib/contexts/AuthContext';
 import {
   GunType,
   IMaSusiApplication,
@@ -29,6 +30,9 @@ import {
   IJungsiSearchResult,
   searchSusiTargetsAPI,
   searchJungsiTargetsAPI,
+  searchGuestSusiTargetsAPI,
+  searchGuestJungsiTargetsAPI,
+  fetchGuestPreviewAPI,
 } from '../lib/api/features/mock-application';
 
 const GUN_TYPES: GunType[] = ['가', '나', '다'];
@@ -41,6 +45,15 @@ interface RouteParams {
 }
 
 type SearchResult = ISusiSearchResult | IJungsiSearchResult;
+
+interface GuestPreview {
+  badge: string;
+  selected: SearchResult;
+  score: number;
+  stats: IMaStats;
+  slotNo?: number;
+  gunType?: GunType;
+}
 
 /** 빈 슬롯 지원 입력 폼 상태 (검색 → 선택 → 제출) */
 interface ApplyFormState {
@@ -68,6 +81,7 @@ export default function SeasonApplyScreen() {
   const route = useRoute<any>();
   const { seasonId, title, seasonType } = (route.params || {}) as RouteParams;
   const isSusi = seasonType === 'SUSI';
+  const { isAuthenticated } = useAuthContext();
 
   const {
     isLoading,
@@ -83,12 +97,15 @@ export default function SeasonApplyScreen() {
 
   const [form, setForm] = useState<ApplyFormState>(EMPTY_FORM);
   const [statsBySlot, setStatsBySlot] = useState<Record<number, IMaStats>>({});
+  const [guestPreviews, setGuestPreviews] = useState<Record<string, GuestPreview>>({});
+  const [previewing, setPreviewing] = useState(false);
 
   useEffect(() => {
     setStatsBySlot({});
+    setGuestPreviews({});
     setForm(EMPTY_FORM);
-    if (seasonId) fetchMyApplications(seasonId);
-  }, [seasonId, fetchMyApplications]);
+    if (seasonId && isAuthenticated) fetchMyApplications(seasonId);
+  }, [seasonId, isAuthenticated, fetchMyApplications]);
 
   const applications = (myApplications?.applications || []) as (
     | IMaSusiApplication
@@ -110,8 +127,12 @@ export default function SeasonApplyScreen() {
     setForm((p) => ({ ...p, searching: true, selected: null, results: [] }));
     try {
       const results = isSusi
-        ? await searchSusiTargetsAPI(keyword)
-        : await searchJungsiTargetsAPI(keyword, seasonId, form.gunType);
+        ? isAuthenticated
+          ? await searchSusiTargetsAPI(keyword)
+          : await searchGuestSusiTargetsAPI(keyword)
+        : isAuthenticated
+          ? await searchJungsiTargetsAPI(keyword, seasonId, form.gunType)
+          : await searchGuestJungsiTargetsAPI(keyword, seasonId, form.gunType);
       setForm((p) => ({ ...p, results, searching: false }));
       if (results.length === 0) {
         Alert.alert('검색 결과 없음', '다른 검색어로 시도해주세요.');
@@ -120,7 +141,7 @@ export default function SeasonApplyScreen() {
       setForm((p) => ({ ...p, searching: false }));
       Alert.alert('검색 실패', e?.response?.data?.message || '잠시 후 다시 시도해주세요.');
     }
-  }, [form.keyword, form.gunType, isSusi, seasonId]);
+  }, [form.keyword, form.gunType, isSusi, isAuthenticated, seasonId]);
 
   // ── 지원 제출 ──────────────────────────────────────────
   const handleSubmit = useCallback(async () => {
@@ -148,6 +169,40 @@ export default function SeasonApplyScreen() {
     }
     const selected = form.selected;
 
+    if (!isAuthenticated) {
+      const badge = isSusi ? `${form.slotNo}번` : `${form.gunType}군`;
+      const key = isSusi ? `slot-${form.slotNo}` : `gun-${form.gunType}`;
+      setPreviewing(true);
+      try {
+        const stats = await fetchGuestPreviewAPI(
+          seasonId,
+          isSusi ? 'SUSI_RU' : 'JUNGSI_ADM',
+          selected.id,
+          score,
+        );
+        setGuestPreviews((prev) => ({
+          ...prev,
+          [key]: {
+            badge,
+            selected,
+            score,
+            stats,
+            slotNo: form.slotNo,
+            gunType: form.gunType,
+          },
+        }));
+        setForm(EMPTY_FORM);
+      } catch (e: any) {
+        Alert.alert(
+          '예측 실패',
+          e?.response?.data?.message || '잠시 후 다시 시도해주세요.',
+        );
+      } finally {
+        setPreviewing(false);
+      }
+      return;
+    }
+
     let ok = false;
     if (isSusi && form.slotNo) {
       const created = await submitSusiApplication({
@@ -173,7 +228,14 @@ export default function SeasonApplyScreen() {
       ok = !!created;
     }
     if (ok) setForm(EMPTY_FORM);
-  }, [form, isSusi, seasonId, submitSusiApplication, submitJungsiApplication]);
+  }, [
+    form,
+    isSusi,
+    isAuthenticated,
+    seasonId,
+    submitSusiApplication,
+    submitJungsiApplication,
+  ]);
 
   // ── 지원 취소 ──────────────────────────────────────────
   const handleCancel = useCallback(
@@ -354,7 +416,132 @@ export default function SeasonApplyScreen() {
     </TouchableOpacity>
   );
 
-  const filledCount = applications.length;
+  const renderGuestPreviewCard = (preview: GuestPreview) => {
+    const { selected, score, stats, badge } = preview;
+    const distribution = [...(stats.distribution || [])].sort((a, b) =>
+      isSusi ? a.binStart - b.binStart : b.binStart - a.binStart,
+    );
+    const maxDistributionCount = Math.max(1, ...distribution.map((bin) => bin.count));
+    const reopenForm = () =>
+      setForm({
+        ...EMPTY_FORM,
+        visible: true,
+        slotNo: preview.slotNo,
+        gunType: preview.gunType,
+        selected,
+        score: String(score),
+      });
+
+    return (
+      <View key={badge} style={[styles.slotCard, styles.slotCardFilled]}>
+        <View style={styles.slotHeader}>
+          <View style={styles.slotBadge}>
+            <Text style={styles.slotBadgeText}>{badge}</Text>
+          </View>
+          <Text style={styles.universityName} numberOfLines={1}>
+            {selected.universityName ?? '-'}
+          </Text>
+          <View style={styles.previewBadge}>
+            <Text style={styles.previewBadgeText}>체험</Text>
+          </View>
+        </View>
+
+        <Text style={styles.recruitmentName} numberOfLines={1}>
+          {selected.recruitmentName}
+          {selected.admissionName ? ` · ${selected.admissionName}` : ''}
+        </Text>
+        <Text style={styles.previewScoreText}>
+          {isSusi ? `내신 ${score.toFixed(2)}등급` : `환산점수 ${score.toFixed(1)}점`}
+        </Text>
+
+        <View style={styles.statsBox}>
+          {stats.open ? (
+            <>
+              <Text style={styles.statsLine}>
+                {stats.dataYear != null && `자료 ${stats.dataYear}학년도 · `}
+                현재 지원자 {stats.applicantCount ?? 0}명
+                {stats.recruitmentNumber != null && ` · 모집 ${stats.recruitmentNumber}명`}
+              </Text>
+              <View style={styles.rankGrid}>
+                <View style={styles.rankItem}>
+                  <Text style={styles.rankLabel}>실시간 경쟁률</Text>
+                  <Text style={styles.rankValue}>
+                    {stats.competitionRatio != null
+                      ? `${Number(stats.competitionRatio).toFixed(2)} : 1`
+                      : '모집인원 확인 중'}
+                  </Text>
+                </View>
+                <View style={styles.rankItem}>
+                  <Text style={styles.rankLabel}>예상 내 순위</Text>
+                  <Text style={styles.rankValue}>
+                    {stats.myRank != null ? `${stats.myRank}등` : '산출 전'}
+                  </Text>
+                </View>
+                <View style={styles.rankItem}>
+                  <Text style={styles.rankLabel}>최초합 순위</Text>
+                  <Text style={styles.rankValue}>
+                    {stats.initialPassRank != null
+                      ? `${stats.initialPassRank}등 이내`
+                      : '산출 전'}
+                  </Text>
+                </View>
+                <View style={styles.rankItem}>
+                  <Text style={styles.rankLabel}>예상 추합 순위</Text>
+                  <Text style={styles.rankValue}>
+                    {stats.expectedAdditionalPassRank != null
+                      ? `${stats.expectedAdditionalPassRank}등 이내`
+                      : '입결 자료 준비 중'}
+                  </Text>
+                </View>
+              </View>
+
+              {distribution.length > 0 && (
+                <View style={styles.distributionBox}>
+                  <Text style={styles.distributionTitle}>지원자 점수 분포</Text>
+                  {distribution.map((bin) => (
+                    <View key={`${bin.binStart}-${bin.binEnd}`} style={styles.distributionRow}>
+                      <Text style={styles.distributionRange}>
+                        {Number(bin.binStart).toFixed(isSusi ? 1 : 0)}–
+                        {Number(bin.binEnd).toFixed(isSusi ? 1 : 0)}
+                      </Text>
+                      <View style={styles.distributionTrack}>
+                        <View
+                          style={[
+                            styles.distributionBar,
+                            {
+                              width: `${
+                                bin.count === 0
+                                  ? 0
+                                  : Math.max(4, (bin.count / maxDistributionCount) * 100)
+                              }%`,
+                            },
+                          ]}
+                        />
+                      </View>
+                      <Text style={styles.distributionCount}>{bin.count}명</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </>
+          ) : (
+            <Text style={styles.statsLine}>
+              {stats.resultOpenAt
+                ? `현황은 ${stats.resultOpenAt.slice(0, 10)}부터 공개됩니다.`
+                : '현황 공개 전입니다.'}
+            </Text>
+          )}
+        </View>
+
+        <Text style={styles.previewNotice}>이 결과는 서버에 저장되지 않습니다.</Text>
+        <TouchableOpacity style={styles.previewAgainButton} onPress={reopenForm}>
+          <Text style={styles.previewAgainText}>조건 바꿔 다시 예측</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  const filledCount = isAuthenticated ? applications.length : Object.keys(guestPreviews).length;
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <AppHeader title={title ?? '모의지원'} onPressMenu={() => navigation.goBack()} />
@@ -372,17 +559,29 @@ export default function SeasonApplyScreen() {
           </Text>
         </View>
 
+        {!isAuthenticated && (
+          <View style={styles.guestBanner}>
+            <Ionicons name="eye-outline" size={20} color={theme.colors.primary} />
+            <View style={styles.guestBannerCopy}>
+              <Text style={styles.guestBannerTitle}>로그인 없이 합격예측 체험 중</Text>
+              <Text style={styles.guestBannerText}>
+                대학 검색·순위·경쟁률을 확인할 수 있으며, 지원서는 저장되지 않습니다.
+              </Text>
+            </View>
+          </View>
+        )}
+
         {error && (
           <TouchableOpacity style={styles.errorBox} onPress={clearError}>
             <Text style={styles.errorText}>{error}</Text>
           </TouchableOpacity>
         )}
 
-        {!myApplications && (isLoading || !error) ? (
+        {isAuthenticated && !myApplications && (isLoading || !error) ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={theme.colors.primary} />
           </View>
-        ) : !myApplications ? (
+        ) : isAuthenticated && !myApplications ? (
           <View style={styles.retryContainer}>
             <Text style={styles.retryText}>
               지원 현황을 불러오지 못했습니다. 빈 슬롯으로 새 지원을 시작하지 말고 다시 시도해주세요.
@@ -396,6 +595,14 @@ export default function SeasonApplyScreen() {
           </View>
         ) : isSusi ? (
           SUSI_SLOTS.map((slotNo) => {
+            if (!isAuthenticated) {
+              const preview = guestPreviews[`slot-${slotNo}`];
+              return preview
+                ? renderGuestPreviewCard(preview)
+                : renderEmptyCard(`${slotNo}번`, () =>
+                    setForm({ ...EMPTY_FORM, visible: true, slotNo }),
+                  );
+            }
             const app = findSusiApp(slotNo);
             return app
               ? renderFilledCard(app, `${slotNo}번`)
@@ -405,6 +612,14 @@ export default function SeasonApplyScreen() {
           })
         ) : (
           GUN_TYPES.map((gunType) => {
+            if (!isAuthenticated) {
+              const preview = guestPreviews[`gun-${gunType}`];
+              return preview
+                ? renderGuestPreviewCard(preview)
+                : renderEmptyCard(`${gunType}군`, () =>
+                    setForm({ ...EMPTY_FORM, visible: true, gunType }),
+                  );
+            }
             const app = findJungsiApp(gunType);
             return app
               ? renderFilledCard(app, `${gunType}군`)
@@ -434,7 +649,13 @@ export default function SeasonApplyScreen() {
           >
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {isSusi ? `${form.slotNo}번 슬롯 지원` : `${form.gunType}군 지원`}
+                {isSusi
+                  ? form.slotNo
+                    ? `${form.slotNo}번 슬롯 지원`
+                    : '수시 모의지원'
+                  : form.gunType
+                    ? `${form.gunType}군 지원`
+                    : '정시·모의평가 모의지원'}
               </Text>
               <TouchableOpacity onPress={() => setForm(EMPTY_FORM)} hitSlop={8}>
                 <Ionicons name="close" size={24} color={theme.colors.muted} />
@@ -523,14 +744,19 @@ export default function SeasonApplyScreen() {
             </Text>
 
             <TouchableOpacity
-              style={[styles.submitButton, isLoading && styles.submitButtonDisabled]}
+              style={[
+                styles.submitButton,
+                (isLoading || previewing) && styles.submitButtonDisabled,
+              ]}
               onPress={handleSubmit}
-              disabled={isLoading}
+              disabled={isLoading || previewing}
             >
-              {isLoading ? (
+              {isLoading || previewing ? (
                 <ActivityIndicator color={theme.colors.onPrimary} />
               ) : (
-                <Text style={styles.submitButtonText}>모의지원 제출</Text>
+                <Text style={styles.submitButtonText}>
+                  {isAuthenticated ? '모의지원 제출' : '합격예측 보기'}
+                </Text>
               )}
             </TouchableOpacity>
           </ScrollView>
@@ -597,6 +823,29 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.small,
     color: theme.colors.muted,
   },
+  guestBanner: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+    padding: theme.spacing.md,
+    borderRadius: theme.radii.md,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.surfaceVariant,
+  },
+  guestBannerCopy: {
+    flex: 1,
+  },
+  guestBannerTitle: {
+    fontSize: theme.typography.small,
+    fontWeight: '700',
+    color: theme.colors.text,
+  },
+  guestBannerText: {
+    marginTop: 2,
+    fontSize: 11,
+    lineHeight: 16,
+    color: theme.colors.muted,
+  },
   errorBox: {
     backgroundColor: '#FFF1F1',
     borderRadius: theme.radii.sm,
@@ -641,6 +890,42 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: theme.colors.muted,
+  },
+  previewBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    backgroundColor: theme.colors.surfaceVariant,
+  },
+  previewBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: theme.colors.primary,
+  },
+  previewScoreText: {
+    marginTop: theme.spacing.xs,
+    fontSize: theme.typography.small,
+    fontWeight: '700',
+    color: theme.colors.primary,
+  },
+  previewNotice: {
+    marginTop: theme.spacing.sm,
+    fontSize: 11,
+    textAlign: 'center',
+    color: theme.colors.muted,
+  },
+  previewAgainButton: {
+    marginTop: theme.spacing.sm,
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderRadius: theme.radii.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+  },
+  previewAgainText: {
+    fontSize: theme.typography.small,
+    fontWeight: '700',
+    color: theme.colors.primary,
   },
   universityName: {
     flex: 1,

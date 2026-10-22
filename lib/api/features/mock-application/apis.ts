@@ -3,7 +3,7 @@
  * 비즈니스 규칙: 수시 시즌당 6회(슬롯 1~6), 정시·6/9월 모평 가/나/다 군별 1회(총 3회)
  */
 
-import { hubAuthClient } from '../../instances';
+import { hubAuthClient, hubPublicClient } from '../../instances';
 import {
   IApiResponse,
   IMaSeason,
@@ -20,10 +20,10 @@ import {
 } from './interfaces';
 
 /** 활성 시즌 목록 (홈 시즌 카드) */
-export const fetchSeasonsAPI = async (): Promise<IMaSeason[]> => {
-  const response = await hubAuthClient.get<IApiResponse<IMaSeason[]>>(
-    '/mock-application/seasons',
-  );
+export const fetchSeasonsAPI = async (authenticated = true): Promise<IMaSeason[]> => {
+  const client = authenticated ? hubAuthClient : hubPublicClient;
+  const path = authenticated ? '/mock-application/seasons' : '/mock-application/guest/seasons';
+  const response = await client.get<IApiResponse<IMaSeason[]>>(path);
   return response.data.data;
 };
 
@@ -81,6 +81,17 @@ export const searchSusiTargetsAPI = async (
   return response.data.data;
 };
 
+/** 비로그인 체험용 수시 모집단위 검색 */
+export const searchGuestSusiTargetsAPI = async (
+  keyword: string,
+): Promise<ISusiSearchResult[]> => {
+  const response = await hubPublicClient.get<IApiResponse<ISusiSearchResult[]>>(
+    '/mock-application/guest/search/susi',
+    { params: { keyword } },
+  );
+  return response.data.data;
+};
+
 /** 정시·모평 모집단위 검색 (군 필터 가능) */
 export const searchJungsiTargetsAPI = async (
   keyword: string,
@@ -89,6 +100,19 @@ export const searchJungsiTargetsAPI = async (
 ): Promise<IJungsiSearchResult[]> => {
   const response = await hubAuthClient.get<IApiResponse<IJungsiSearchResult[]>>(
     '/mock-application/search/jungsi',
+    { params: gunType ? { keyword, seasonId, gunType } : { keyword, seasonId } },
+  );
+  return response.data.data;
+};
+
+/** 비로그인 체험용 정시·모평 모집단위 검색 */
+export const searchGuestJungsiTargetsAPI = async (
+  keyword: string,
+  seasonId: number,
+  gunType?: GunType,
+): Promise<IJungsiSearchResult[]> => {
+  const response = await hubPublicClient.get<IApiResponse<IJungsiSearchResult[]>>(
+    '/mock-application/guest/search/jungsi',
     { params: gunType ? { keyword, seasonId, gunType } : { keyword, seasonId } },
   );
   return response.data.data;
@@ -103,6 +127,20 @@ export const fetchStatsAPI = async (
   const response = await hubAuthClient.get<IApiResponse<IMaStats>>(
     '/mock-application/stats',
     { params: { seasonId, targetType, targetId } },
+  );
+  return response.data.data;
+};
+
+/** 비로그인 체험용 점수 기반 합격예측. 서버에는 지원 내역을 저장하지 않는다. */
+export const fetchGuestPreviewAPI = async (
+  seasonId: number,
+  targetType: MaStatsTargetType,
+  targetId: number,
+  score: number,
+): Promise<IMaStats> => {
+  const response = await hubPublicClient.get<IApiResponse<IMaStats>>(
+    '/mock-application/guest/preview',
+    { params: { seasonId, targetType, targetId, score } },
   );
   return response.data.data;
 };

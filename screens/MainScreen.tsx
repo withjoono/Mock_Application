@@ -44,7 +44,7 @@ export default function MainScreen() {
 
   useEffect(() => {
     // 비로그인/백엔드 미연결 시 조용히 실패하고 폴백 라벨 표시
-    fetchSeasons();
+    fetchSeasons(isAuthenticated);
   }, [fetchSeasons, isAuthenticated]);
 
   const handleEmailLogin = async () => {
@@ -119,14 +119,27 @@ export default function MainScreen() {
       }
       Alert.alert(
         '시즌 정보를 불러오지 못했습니다',
-        isAuthenticated ? '잠시 후 다시 시도해주세요.' : '로그인 후 이용해주세요.',
+        isAuthenticated
+          ? '잠시 후 다시 시도해주세요.'
+          : '체험 정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.',
       );
       return;
     }
     if (!season.isOpen) {
+      if (!isAuthenticated) {
+        navigation.navigate('SeasonApply', {
+          seasonId: season.id,
+          title: season.title,
+          seasonType: season.seasonType,
+        });
+        return;
+      }
+      const hasEnded = new Date(season.closeAt).getTime() < Date.now();
       Alert.alert(
-        '오픈 예정',
-        `${season.title}은(는) ${season.openAt.slice(0, 10)}부터 지원할 수 있습니다.`,
+        hasEnded ? '운영 종료' : '오픈 예정',
+        hasEnded
+          ? `${season.title} 운영이 종료되었습니다. 다음 시즌 일정은 추후 안내됩니다.`
+          : `${season.title}은(는) ${season.openAt.slice(0, 10)}부터 지원할 수 있습니다.`,
       );
       return;
     }
@@ -153,7 +166,7 @@ export default function MainScreen() {
           >
             T 모지
           </Text>
-          <Text style={styles.subtitle}>수시/정시 무료 모의지원 앱</Text>
+          <Text style={styles.subtitle}>수시·정시 모의지원 합격 예측</Text>
         </View>
 
         <View style={styles.wheelArea}>
@@ -193,14 +206,19 @@ export default function MainScreen() {
               </TouchableOpacity>
             </View>
           ) : (
-            <AuthButton
-              label="거북스쿨 계정으로 로그인"
-              onPress={() => setLoginVisible(true)}
-              backgroundColor={theme.colors.primary}
-              textColor={theme.colors.onPrimary}
-              icon={<Ionicons name="log-in-outline" size={18} color={theme.colors.onPrimary} />}
-              style={styles.authButton}
-            />
+            <View>
+              <Text style={styles.guestHint}>
+                시즌 카드를 눌러 로그인 없이 대학 검색과 합격예측을 체험하세요.
+              </Text>
+              <AuthButton
+                label="거북스쿨 계정으로 로그인"
+                onPress={() => setLoginVisible(true)}
+                backgroundColor={theme.colors.primary}
+                textColor={theme.colors.onPrimary}
+                icon={<Ionicons name="log-in-outline" size={18} color={theme.colors.onPrimary} />}
+                style={styles.authButton}
+              />
+            </View>
           )}
           <AppFooter />
         </View>
@@ -308,6 +326,14 @@ const styles = StyleSheet.create({
   },
   authButton: {
     width: '100%',
+  },
+  guestHint: {
+    marginBottom: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.sm,
+    textAlign: 'center',
+    fontSize: 12,
+    lineHeight: 17,
+    color: theme.colors.muted,
   },
   profileRow: {
     flexDirection: 'row',

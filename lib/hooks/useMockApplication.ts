@@ -51,10 +51,10 @@ export const useMockApplication = () => {
   }, []);
 
   /** 활성 시즌 목록 */
-  const fetchSeasons = useCallback(async (): Promise<IMaSeason[]> => {
+  const fetchSeasons = useCallback(async (authenticated = true): Promise<IMaSeason[]> => {
     setLoading(true);
     try {
-      const seasons = await fetchSeasonsAPI();
+      const seasons = await fetchSeasonsAPI(authenticated);
       setState((prev) => ({ ...prev, seasons, isLoading: false }));
       return seasons;
     } catch (e) {

@@ -35,7 +35,7 @@
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
-    "description": "수시/정시 무료 모의지원 앱",
+    "description": "수시·정시 모의지원 합격 예측",
     "owner": "junhokang",
     "primaryColor": "#0B5FFF",
     "runtimeVersion": {
@@ -44,6 +44,11 @@
     "plugins": [
       "expo-asset",
       "expo-font"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "e56700b5-223f-4775-9865-79076fcf72dd"
+      }
+    }
   }
 }

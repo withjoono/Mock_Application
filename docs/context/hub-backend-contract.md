@@ -20,10 +20,12 @@ type: reference
 | Swagger | `{prod}/swagger` 의 **`MockApplication (모의지원 ma_*)`** 태그 |
 
 Hub 컨트롤러는 `@Controller('mock-application')` 이고 전역 `JwtAuthGuard` 아래에서 `req.memberId` 를 쓴다.
+단, 스토어 가이드라인에 맞추어 **저장하지 않는 비회원 체험 라우트 4개**만 `@Public()` 이다.
 
-## 2. 라우트 ↔ 클라이언트 함수 대응 (10개, 1:1)
+## 2. 라우트 ↔ 클라이언트 함수 대응
 
-`lib/api/features/mock-application/apis.ts` — 전부 `hubAuthClient` 사용.
+`lib/api/features/mock-application/apis.ts` — 지원서 저장·취소·내 내역은 `hubAuthClient`,
+익명 검색·합격예측 체험은 `hubPublicClient` 를 사용한다.
 
 | 클라이언트 함수 | Hub 라우트 |
 |---|---|
@@ -36,8 +38,13 @@ Hub 컨트롤러는 `@Controller('mock-application')` 이고 전역 `JwtAuthGuar
 | `searchSusiTargetsAPI(keyword)` | `GET /mock-application/search/susi?keyword=` |
 | `searchJungsiTargetsAPI(keyword, seasonId, gunType?)` | `GET /mock-application/search/jungsi?keyword=&seasonId=&gunType=` |
 | `fetchStatsAPI(seasonId, targetType, targetId)` | `GET /mock-application/stats?seasonId=&targetType=&targetId=` |
+| `fetchSeasonsAPI(false)` | `GET /mock-application/guest/seasons` |
+| `searchGuestSusiTargetsAPI(keyword)` | `GET /mock-application/guest/search/susi?keyword=` |
+| `searchGuestJungsiTargetsAPI(keyword, seasonId, gunType?)` | `GET /mock-application/guest/search/jungsi?keyword=&seasonId=&gunType=` |
+| `fetchGuestPreviewAPI(seasonId, targetType, targetId, score)` | `GET /mock-application/guest/preview?seasonId=&targetType=&targetId=&score=` |
 
 응답은 Hub 의 `SuccessResponseInterceptor` 로 `{ success, data }` 래핑되므로 클라이언트가 `response.data.data` 를 꺼낸다.
+비회원 `preview`는 입력 점수를 현재 분포에 대입해 예상 순위만 반환하며 `ma_*_application`에 아무 것도 저장하지 않는다.
 
 ## 3. `ma_*` 테이블 — `hub` 스키마에 있다
 
@@ -106,7 +113,8 @@ BASE=https://ts-back-nest-479305.du.r.appspot.com
 # 2) 시즌 목록             GET  $BASE/mock-application/seasons        (활성 시즌이 isOpen=true)
 # 3) 검색                  GET  "$BASE/mock-application/search/jungsi?keyword=...&season_id=...&gun_type=..."
 # 4) 지원 제출 → 군별 1회 제한 확인 (같은 군 2번째 제출 시 409)
-# 5) Swagger $BASE/swagger 의 'MockApplication (모의지원 ma_*)' 태그
+# 5) 비회원 시즌/검색/예측 GET $BASE/mock-application/guest/* (토큰 없이 200, 저장 없음)
+# 6) Swagger $BASE/swagger 의 'MockApplication (모의지원 ma_*)' 태그
 ```
 
 검증 포인트: 시즌 4개 시드 / 검색이 실데이터 반환 / 수시 7번째 제출 409 / 가군 중복 409 /

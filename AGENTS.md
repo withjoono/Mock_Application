@@ -217,13 +217,12 @@ MANUAL tmoji         Expo 앱 — assets/ 아이콘 별도 처리
 - 남은 출시 항목은 `docs/release-checklist.md` 의 체크박스로 관리한다(개발자 계정, Play 데이터 안전 설문 /
   App Store App Privacy, 심사용 테스트 계정, 스크린샷, 크래시 리포팅).
 
-### 7. ⚠️ 이 폴더는 git 리포가 아니다 (2026-09-03 실측)
+### 7. 이 폴더는 독립 git 리포다 (2026-10-08 갱신)
 
-- `Mock_Application/` 에 **`.git` 이 없다.** `docs/release-checklist.md` 의 1-A 항목이
-  *"샌드박스에서 git init 시 메타데이터가 손상되어 저장소 초기화는 PC에서 직접 실행해야 함"* 이라고 적어 둔
-  그 단계가 **아직 끝나지 않은 상태**로 보인다.
-- 커밋·PR 작업 전에 `git init -b main` + `git remote add origin https://github.com/withjoono/Mock_Application.git`
-  상태를 **먼저 확인**할 것. 원격에 이미 내용이 있는지도 확인 필요.
+- `Mock_Application/` 은 `main` 브랜치로 초기화됐고 원격은
+  `https://github.com/withjoono/Mock_Application.git` 이다.
+- 2026-10-08 최초 출시 준비 커밋을 원격 `main`에 push했다. 커밋·PR 작업 전 일반적인 방식으로
+  현재 브랜치와 worktree 변경 상태를 확인한다.
 - 별도로 `github/Mock-Application(Native)/` 폴더가 있다 — 구 React Native CLI 버전(`src/`, `metro.config.js`,
   `Susi_재사용자산_매핑.md`)이고 자체 `.git` 을 갖고 있다. **이 리포가 아니다. 혼동 금지.**
 
