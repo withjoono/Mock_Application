@@ -1,6 +1,6 @@
 # 모의지원앱 출시 체크리스트
 
-> 작성: 2026-06-05 · 최종 점검: 2026-10-08 · 대상: Android(Play Store) / iOS(App Store)
+> 작성: 2026-06-05 · 최종 점검: 2026-10-23 · 대상: Android(Play Store) / iOS(App Store)
 
 ## 1. 저장소 & 프로드 배포
 
@@ -21,6 +21,10 @@
 2026-10-21 App Review 2.1 거절 대응: 프로덕션 `/mock-application/seasons`가 빈 배열을 반환하는 것을 재현했습니다. 과거 스키마 복구 과정에서 최초 시즌 마이그레이션은 적용 완료로 기록됐지만 시드 행이 누락됐고, 10월 8일 마이그레이션은 기존 행만 갱신해 복구하지 못한 것이 원인이었습니다. Hub `main`의 `afaf15e`가 네 시즌을 멱등 upsert했고, `a9a6f54`는 종료된 2027학년도 6·9월 모평을 일반 사용자에게 다시 닫고 Apple 심사용 계정에만 9월 시즌 접근을 허용했습니다. 후속 `dc38235`는 이 예외를 현재 심사용 2027학년도 9월 시즌으로만 제한해 향후 2028학년도 시즌에 영향을 주지 않게 했습니다. App Engine `default` 버전 `20261021t052707` 배포 로그에서 PostgreSQL 14.23/Linux, `susi_calculation_formula=1,267`, `susi_unit=33,770` 신원 게이트, 전체 schema drift 및 공용 DB 연결 예산 검사를 통과했습니다. 심사용 계정 실측으로 6월 `isOpen=false`, 9월 `isOpen=true`(심사 전용), 정시 모집단위 검색 30건, 지원 생성→조회→취소를 확인했으며 테스트 지원서는 즉시 삭제했습니다. 일반 계정의 종료 시즌 비공개 및 미래 학년도 예외 차단은 단위 테스트로 검증했습니다.
 
 2026-10-22 App Review 5.1.1(v) / 2.3.3 재심사 대응: 계정 없이도 시즌 선택 → 대학·모집단위 검색 → 점수 입력 → 경쟁률·예상 내 순위·최초합 순위·예상 추합 순위를 조회하는 체험 흐름을 추가했습니다. 익명 입력은 서버에 저장하지 않고, 지원서 저장·취소·내 내역만 로그인을 요구합니다. Hub `523c20d`가 프로덕션에 배포됐고, Actions의 빌드·마이그레이션·schema drift·App Engine·CORS 검사가 모두 통과했습니다. 프로덕션 익명 API 실측으로 시즌 4개, 수시/정시 검색 각 30건, 저장 없는 합격예측 200 응답을 확인했습니다.
+
+앱 `57a23e7`(후속 스크린샷 `9dd1fa5`)로 Expo SDK 54 production iOS 빌드 `1.0.0 (10)`을 성공했고, EAS 빌드 ID `c24120ed-ca74-43f9-a757-3f57b2c06eb5`를 App Store Connect에 업로드했습니다. iOS·Android production Hermes 번들, TypeScript, Expo 의존성 호환성 검사가 통과했습니다.
+
+2026-10-23 App Store Connect에서 실제 핵심 기능 화면 4장(홈·시즌·검색·비회원 합격예측)을 Dynamic Island 지원 iPhone 중형 디스플레이 자산으로 교체하고, 심사 메모와 회신에 비회원 흐름 및 계정 필요 기능의 범위를 명시했습니다. 빌드 `1.0.0 (10)`으로 재제출했으며 현재 상태는 **심사 대기 중**입니다.
 
 ### 배포 후 검증 시나리오 (prod)
 
@@ -68,7 +72,8 @@ curl -s "$BASE/mock-application/search/jungsi?keyword=%EC%84%9C%EC%9A%B8&season_
 - [x] **개인정보처리방침 공개본 갱신** — `https://www.tskool.kr/tmoji-privacy` HTTP 200, `성명: 강준호`, placeholder 없음
 - [ ] **데이터 안전 설문**(Play Console) / **App Privacy**(App Store Connect) 작성
 - [x] **심사용 테스트 계정** App Store Connect에 제공 (계정 기능 확인용; 합격예측 체험은 비회원으로도 가능)
-- [ ] 스크린샷 업로드 (iPhone 6.7"/6.5", Android 폰 최소 2장) — `docs/store-screenshots/` 에 홈·시즌·검색·예측 4장 후보 생성 완료
+- [x] iOS 스크린샷 업로드 — Dynamic Island 지원 iPhone 중형 디스플레이용 홈·시즌·검색·예측 4장 반영
+- [ ] Android 폰 스크린샷 최소 2장 업로드
 - [x] 앱 이름 확정: **"T 모지"** / 설명: "수시·정시 모의지원 합격 예측" / 푸터: © T Skool (tskool.kr 링크)
 
 ### 빌드·제출 명령
