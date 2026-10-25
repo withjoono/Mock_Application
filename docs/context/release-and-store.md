@@ -1,6 +1,6 @@
 ---
 name: release-and-store
-description: T모지 EAS 빌드·스토어 제출 상태, Expo 라 브랜드 자산 동기화가 MANUAL 인 점, git 리포 미초기화 상태, __DEV__ 게이트로 숨긴 미완성 화면
+description: T모지 EAS 빌드·스토어 제출 상태, Expo 라 브랜드 자산 동기화가 MANUAL 인 점, git 리포 상태(현재 독립 리포), __DEV__ 게이트로 숨긴 미완성 화면
 type: project
 ---
 
@@ -8,7 +8,13 @@ type: project
 
 원본 체크리스트: `docs/release-checklist.md` (2026-06-05 작성). 아래는 2026-09-03 리포 실측으로 재확인한 내용이다.
 
-## 1. ⚠️ 이 폴더는 git 리포가 아니다
+## 1. git 리포 상태
+
+> **2026-10-25 갱신:** 이 절의 "git 리포가 아니다"는 **옛 내용**이다. 현재는 독립 리포(`main`, origin =
+> `https://github.com/withjoono/Mock_Application.git`)이며 최신 규칙은 `AGENTS.md` 고유 규칙 7을 따른다.
+> 아래는 기록용으로 남겨 둔다.
+
+### (옛 기록) 이 폴더는 git 리포가 아니었다
 
 `Mock_Application/` 에 **`.git` 디렉터리가 없다**(실측 확인).
 

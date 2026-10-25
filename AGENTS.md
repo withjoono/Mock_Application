@@ -6,7 +6,7 @@
 ## 이 리포는 무엇인가
 
 **T모지 — 수시/정시 무료 모의지원 앱.** 합격예측을 위한 모의지원을 받고 실시간 경쟁률·분포를 보여준다.
-**Expo(SDK 52) + React Native 0.76, 모바일 전용.** 웹 프런트도 Firebase Hosting site 도 **없다.**
+**Expo(SDK 54) + React Native 0.81, 모바일 전용.** 웹 프런트도 Firebase Hosting site 도 **없다.**
 
 - `App.tsx` / `index.ts` — Expo `registerRootComponent`, React Navigation native-stack
 - `screens/` (11) · `components/` (16) · `lib/{api,contexts,hooks,types}` · `assets/` · `docs/` · `tests/e2e`(Playwright, web 대상)
@@ -251,6 +251,7 @@ MANUAL tmoji         Expo 앱 — assets/ 아이콘 별도 처리
 | `hub-backend-contract.md` | 모의지원 API·`ma_*` 테이블·제약을 건드릴 때 (**백엔드는 Hub 에 있다**) |
 | `auth-and-api-clients.md` | 로그인·토큰·axios 클라이언트·환경별 API 베이스 작업 |
 | `release-and-store.md` | EAS 빌드·스토어 제출·브랜드 자산·git 리포 상태 |
+| `project-memory-decisions.md` | 가격·범위 경계·humps/refresh 예외·데이터 위치·사고 교훈 (claude.ai 프로젝트 기억에서 이관) |
 
 > 리포 자체 문서: `docs/ma-db-schema-design.md`(설계안 + 구현 변경 노트), `docs/release-checklist.md`(출시 체크리스트).
 
@@ -260,7 +261,7 @@ MANUAL tmoji         Expo 앱 — assets/ 아이콘 별도 처리
 
 ```bash
 npm install
-npx expo install --fix        # SDK 52 버전 정렬
+npx expo install --fix        # SDK 54 버전 정렬
 
 npm start                     # = npx expo start
 npm run android               # expo run:android
