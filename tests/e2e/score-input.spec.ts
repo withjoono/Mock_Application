@@ -4,7 +4,7 @@ test.describe('점수 입력 화면', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     // 메인 화면에서 정시 모의지원 버튼 클릭
-    await page.getByText('정시 모의지원').click();
+    await page.getByText('T정시', { exact: true }).click();
     await expect(page).toHaveURL(/ScoreInput/);
   });
 
@@ -90,7 +90,7 @@ test.describe('메인 화면', () => {
 
   test('메인 화면이 정상적으로 렌더링된다', async ({ page }) => {
     await expect(page.getByText('모의지원')).toBeVisible();
-    await expect(page.getByText('정시 모의지원')).toBeVisible();
+    await expect(page.getByText('T정시', { exact: true })).toBeVisible();
   });
 
   test('로그인 버튼들이 표시된다', async ({ page }) => {
@@ -99,7 +99,7 @@ test.describe('메인 화면', () => {
   });
 
   test('정시 모의지원 버튼 클릭 시 점수입력 화면으로 이동한다', async ({ page }) => {
-    await page.getByText('정시 모의지원').click();
+    await page.getByText('T정시', { exact: true }).click();
     await expect(page.getByText('점수 입력')).toBeVisible();
   });
 });
@@ -107,7 +107,7 @@ test.describe('메인 화면', () => {
 test.describe('네비게이션', () => {
   test('햄버거 메뉴에서 화면 전환이 가능하다', async ({ page }) => {
     await page.goto('/');
-    await page.getByText('정시 모의지원').click();
+    await page.getByText('T정시', { exact: true }).click();
 
     // 메뉴 버튼 클릭 (햄버거 아이콘)
     const menuButton = page.locator('[data-testid="menu-button"]').or(

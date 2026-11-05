@@ -8,13 +8,13 @@ test.describe('앱 네비게이션', () => {
     await expect(page.getByText('모의지원')).toBeVisible();
 
     // 정시 모의지원 → 점수 입력
-    await page.getByText('정시 모의지원').click();
+    await page.getByText('T정시', { exact: true }).click();
     await expect(page.getByText('점수 입력')).toBeVisible();
   });
 
   test('점수 입력 화면에서 원점수/표준점수 탭 전환이 가능하다', async ({ page }) => {
     await page.goto('/');
-    await page.getByText('정시 모의지원').click();
+    await page.getByText('T정시', { exact: true }).click();
 
     // 원점수 입력 탭 확인
     await expect(page.getByText('원점수 입력')).toBeVisible();
@@ -31,7 +31,7 @@ test.describe('대학 검색', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     // 먼저 점수입력 화면으로 이동
-    await page.getByText('정시 모의지원').click();
+    await page.getByText('T정시', { exact: true }).click();
   });
 
   test('대학 검색 화면에 접근할 수 있다', async ({ page }) => {
@@ -48,7 +48,7 @@ test.describe('대학 검색', () => {
 test.describe('전략 화면', () => {
   test('전략 화면에서 6개 행이 표시된다', async ({ page }) => {
     await page.goto('/');
-    await page.getByText('정시 모의지원').click();
+    await page.getByText('T정시', { exact: true }).click();
 
     // 메뉴를 통해 전략 화면으로 이동
     const menuButton = page.locator('[data-testid="menu-button"]');

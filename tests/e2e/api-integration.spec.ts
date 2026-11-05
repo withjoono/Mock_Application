@@ -20,7 +20,7 @@ test.describe('API 연동 테스트', () => {
     });
 
     await page.goto('/');
-    await page.getByText('정시 모의지원').click();
+    await page.getByText('T정시', { exact: true }).click();
 
     // 점수 입력
     const input = page.locator('input').first();
@@ -47,7 +47,7 @@ test.describe('API 연동 테스트', () => {
     });
 
     await page.goto('/');
-    await page.getByText('정시 모의지원').click();
+    await page.getByText('T정시', { exact: true }).click();
 
     // 페이지가 완전히 로드될 때까지 대기
     await page.waitForLoadState('networkidle');
@@ -67,7 +67,7 @@ test.describe('오프라인 동작', () => {
     await context.route('**/*.convex.cloud/**', (route) => route.abort());
 
     // 점수 입력 화면으로 이동
-    await page.getByText('정시 모의지원').click();
+    await page.getByText('T정시', { exact: true }).click();
 
     // UI 요소들이 정상적으로 렌더링되는지 확인
     await expect(page.getByText('국어')).toBeVisible();
@@ -79,7 +79,7 @@ test.describe('오프라인 동작', () => {
 test.describe('실시간 데이터 동기화', () => {
   test('데이터 변경 시 UI가 업데이트된다', async ({ page }) => {
     await page.goto('/');
-    await page.getByText('정시 모의지원').click();
+    await page.getByText('T정시', { exact: true }).click();
 
     // 입력 필드에 값 입력
     const input = page.locator('input').first();

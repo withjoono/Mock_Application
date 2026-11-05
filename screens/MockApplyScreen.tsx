@@ -210,7 +210,7 @@ export default function MockApplyScreen() {
             <MaterialIcons name="insights" size={32} color={theme.colors.primary} />
           </View>
           <View style={styles.guideTextContainer}>
-            <Text style={styles.guideTitle}>2026 정시 모의지원 시뮬레이션</Text>
+            <Text style={styles.guideTitle}>2026 T정시 시뮬레이션</Text>
             <Text style={styles.guideText}>
               작년 경쟁률 상황에서, "작년 입결 + 올해 실제 모의지원" 데이터를 기반으로
               합격/불합격 가능성과 예상 등수를 알려드립니다.

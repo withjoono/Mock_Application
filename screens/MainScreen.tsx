@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -6,44 +6,50 @@ import {
   Image,
   TouchableOpacity,
   Alert,
-  Modal,
+  ScrollView,
+  StatusBar,
   TextInput,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Defs, RadialGradient, Stop, Circle } from 'react-native-svg';
+import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import theme from '../lib/theme';
 import AuthButton from '../components/AuthButton';
-import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
-import FeaturePaddle from '../components/FeaturePaddle';
-import { useNavigation } from '@react-navigation/native';
+import AppFooter from '../components/AppFooter';
+import BottomSheet from '../components/BottomSheet';
+import Field from '../components/Field';
+import { FeaturedSeasonCard, SeasonRow, getSeasonStatus } from '../components/SeasonCard';
 import { useMockApplication } from '../lib/hooks/useMockApplication';
 import { IMaSeason, MaSeasonType } from '../lib/api/features/mock-application';
 import { useAuthContext } from '../lib/contexts/AuthContext';
-import AppFooter from '../components/AppFooter';
+import { SEASON_LABELS } from '../lib/season-labels';
 
-// 시즌 카드 표시 순서 및 폴백 라벨 (시즌 API 미로딩 시)
-const SEASON_ORDER: { type: MaSeasonType; fallbackLabel: string; emphasis: number }[] = [
-  { type: 'SUSI', fallbackLabel: '수시 모의지원', emphasis: 0.9 },
-  { type: 'JUNGSI', fallbackLabel: '정시 모의지원', emphasis: 1.0 },
-  { type: 'MOCK_SEPT', fallbackLabel: '9평 모의지원', emphasis: 0.9 },
-  { type: 'MOCK_JUNE', fallbackLabel: '6평 모의지원', emphasis: 0.85 },
-];
+// 시즌 표시 순서와 카드 문구
+const SEASON_ORDER: MaSeasonType[] = ['SUSI', 'JUNGSI', 'MOCK_SEPT', 'MOCK_JUNE'];
+
+const SEASON_COPY: Record<MaSeasonType, { title: string; qualifier?: string; caption: string }> = {
+  SUSI: { title: 'T수시', caption: '6개 대학까지 지원하고 실시간 순위 확인' },
+  JUNGSI: { title: 'T정시', caption: '수능 성적으로 가·나·다군 모의지원' },
+  MOCK_SEPT: { title: 'T정시', qualifier: '9월 모의평가', caption: '9월 모평 성적으로 가·나·다군 모의지원' },
+  MOCK_JUNE: { title: 'T정시', qualifier: '6월 모의평가', caption: '6월 모평 성적으로 가·나·다군 모의지원' },
+};
 
 export default function MainScreen() {
   const navigation = useNavigation<any>();
-  const { seasons, fetchSeasons } = useMockApplication();
+  const { seasons, fetchSeasons, isLoading } = useMockApplication();
   const { user, isAuthenticated, loginWithEmail, logout, withdrawAccount } = useAuthContext();
 
-  // 로그인 모달 상태
+  // 로그인 시트 상태
   const [loginVisible, setLoginVisible] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loggingIn, setLoggingIn] = useState(false);
+  const passwordRef = useRef<TextInput>(null);
 
   useEffect(() => {
-    // 비로그인/백엔드 미연결 시 조용히 실패하고 폴백 라벨 표시
+    // 비로그인/백엔드 미연결 시 조용히 실패하고 '일정 미정'으로 표시
     fetchSeasons(isAuthenticated);
   }, [fetchSeasons, isAuthenticated]);
 
@@ -61,6 +67,7 @@ export default function MainScreen() {
       setLoginVisible(false);
       setEmail('');
       setPassword('');
+      setShowPassword(false);
     }
   };
 
@@ -109,7 +116,7 @@ export default function MainScreen() {
     return map;
   }, [seasons]);
 
-  const handleSeasonPress = (type: MaSeasonType, fallbackLabel: string) => {
+  const handleSeasonPress = (type: MaSeasonType) => {
     const season = seasonByType.get(type);
     if (!season) {
       if (__DEV__ && type === 'JUNGSI') {
@@ -125,11 +132,12 @@ export default function MainScreen() {
       );
       return;
     }
+    const title = `${season.year}학년도 ${SEASON_LABELS[type]}`;
     if (!season.isOpen) {
       if (!isAuthenticated) {
         navigation.navigate('SeasonApply', {
           seasonId: season.id,
-          title: season.title,
+          title,
           seasonType: season.seasonType,
         });
         return;
@@ -138,140 +146,227 @@ export default function MainScreen() {
       Alert.alert(
         hasEnded ? '운영 종료' : '오픈 예정',
         hasEnded
-          ? `${season.title} 운영이 종료되었습니다. 다음 시즌 일정은 추후 안내됩니다.`
-          : `${season.title}은(는) ${season.openAt.slice(0, 10)}부터 지원할 수 있습니다.`,
+          ? `${title} 운영이 종료되었습니다. 다음 시즌 일정은 추후 안내됩니다.`
+          : `${title}은(는) ${season.openAt.slice(0, 10)}부터 지원할 수 있습니다.`,
       );
       return;
     }
     navigation.navigate('SeasonApply', {
       seasonId: season.id,
-      title: season.title,
+      title,
       seasonType: season.seasonType,
     });
   };
 
+  // 지금 열린 시즌은 위에 크게, 나머지는 목록으로
+  const seasonItems = SEASON_ORDER.map((type) => {
+    const season = seasonByType.get(type);
+    return { type, season, ...getSeasonStatus(season, isLoading) };
+  });
+  const openItems = seasonItems.filter((item) => item.status === 'open');
+  const otherItems = seasonItems.filter((item) => item.status !== 'open');
+  const seasonYear = seasons[0]?.year;
+  const displayName = user?.nickname || user?.name || user?.email || '';
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <View style={styles.content}>
+      <StatusBar barStyle="light-content" backgroundColor={theme.colors.ink} />
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* 브랜드 */}
         <View style={styles.brandArea}>
-          <View style={styles.logoBadge} accessible accessibilityLabel="앱 로고: 대학 심볼">
-            <MaterialCommunityIcons name="school" size={44} color={theme.colors.onPrimary} />
+          <View style={styles.emblemWrap}>
+            <Svg width={220} height={220} style={styles.emblemGlow}>
+              <Defs>
+                <RadialGradient id="emblemGlow" cx="50%" cy="50%" r="50%">
+                  <Stop offset="0" stopColor={theme.colors.bronze} stopOpacity="0.32" />
+                  <Stop offset="0.55" stopColor={theme.colors.bronze} stopOpacity="0.08" />
+                  <Stop offset="1" stopColor={theme.colors.bronze} stopOpacity="0" />
+                </RadialGradient>
+              </Defs>
+              <Circle cx={110} cy={110} r={110} fill="url(#emblemGlow)" />
+            </Svg>
+            {/* 엠블럼의 짙은 음영이 어두운 배경에 묻히지 않도록 아이보리 메달 위에 올린다 */}
+            <View style={styles.medallion}>
+              <Image
+                source={require('../assets/brand-logo.png')}
+                style={styles.logo}
+                resizeMode="contain"
+                accessible
+                accessibilityLabel="T 모지 로고"
+              />
+            </View>
           </View>
-
-          <Text
-            style={styles.title}
-            accessibilityRole="header"
-            accessibilityLabel="앱명 T 모지"
-          >
+          <Text style={styles.title} accessibilityRole="header" accessibilityLabel="앱명 T 모지">
             T 모지
           </Text>
           <Text style={styles.subtitle}>수시·정시 모의지원 합격 예측</Text>
         </View>
 
-        <View style={styles.wheelArea}>
-          {SEASON_ORDER.map(({ type, fallbackLabel, emphasis }, index) => {
-            const season = seasonByType.get(type);
-            const label = season ? season.title.replace(/^\d+학년도\s*/, '') : fallbackLabel;
-            const isOpen = season?.isOpen ?? type === 'JUNGSI';
+        {/* 지금 지원할 수 있는 시즌 */}
+        {openItems.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>지금 지원할 수 있어요</Text>
+            <View style={styles.featuredList}>
+              {openItems.map(({ type, season, status, dday }) => (
+                <FeaturedSeasonCard
+                  key={type}
+                  {...SEASON_COPY[type]}
+                  season={season}
+                  status={status}
+                  dday={dday}
+                  onPress={() => handleSeasonPress(type)}
+                  accessibilityLabel={SEASON_LABELS[type]}
+                />
+              ))}
+            </View>
+          </View>
+        )}
 
-            return (
-              <React.Fragment key={type}>
-                {index > 0 && <View style={{ height: theme.spacing.md }} />}
-                <TouchableOpacity
-                  activeOpacity={0.9}
-                  onPress={() => handleSeasonPress(type, fallbackLabel)}
-                >
-                  <FeaturePaddle label={label} active={isOpen} emphasis={emphasis} />
-                </TouchableOpacity>
-              </React.Fragment>
-            );
-          })}
-        </View>
+        {/* 그 밖의 시즌 */}
+        {otherItems.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>
+              {openItems.length > 0
+                ? '다른 시즌'
+                : seasonYear
+                  ? `${seasonYear}학년도 시즌`
+                  : '시즌 일정'}
+            </Text>
+            <View style={styles.group}>
+              {otherItems.map(({ type, season, status, dday }, index) => (
+                <React.Fragment key={type}>
+                  {index > 0 && <View style={styles.groupDivider} />}
+                  <SeasonRow
+                    {...SEASON_COPY[type]}
+                    season={season}
+                    status={status}
+                    dday={dday}
+                    onPress={() => handleSeasonPress(type)}
+                    accessibilityLabel={SEASON_LABELS[type]}
+                  />
+                </React.Fragment>
+              ))}
+            </View>
+          </View>
+        )}
 
-        <View style={styles.bottomArea}>
+        {/* 계정 */}
+        <View style={styles.section}>
           {isAuthenticated ? (
-            <View>
-              <View style={styles.profileRow}>
-                <Ionicons name="person-circle" size={28} color={theme.colors.primary} />
-                <Text style={styles.profileName} numberOfLines={1}>
-                  {user?.nickname || user?.name || user?.email}
-                </Text>
-                <TouchableOpacity onPress={handleLogout} hitSlop={8}>
+            <>
+              <View style={[styles.group, styles.accountRow]}>
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>{displayName.slice(0, 1) || 'T'}</Text>
+                </View>
+                <View style={styles.accountText}>
+                  <Text style={styles.accountName} numberOfLines={1}>
+                    {displayName}
+                  </Text>
+                  {!!user?.email && user.email !== displayName && (
+                    <Text style={styles.accountEmail} numberOfLines={1}>
+                      {user.email}
+                    </Text>
+                  )}
+                </View>
+                <TouchableOpacity
+                  onPress={handleLogout}
+                  hitSlop={8}
+                  style={styles.logoutButton}
+                  accessibilityRole="button"
+                >
                   <Text style={styles.logoutText}>로그아웃</Text>
                 </TouchableOpacity>
               </View>
-              <TouchableOpacity onPress={handleWithdraw} style={styles.withdrawButton} hitSlop={8}>
+              <TouchableOpacity
+                onPress={handleWithdraw}
+                style={styles.withdrawButton}
+                hitSlop={8}
+                accessibilityRole="button"
+              >
                 <Text style={styles.withdrawText}>회원 탈퇴</Text>
               </TouchableOpacity>
-            </View>
+            </>
           ) : (
-            <View>
-              <Text style={styles.guestHint}>
-                시즌 카드를 눌러 로그인 없이 대학 검색과 합격예측을 체험하세요.
-              </Text>
+            <>
               <AuthButton
-                label="거북스쿨 계정으로 로그인"
+                label="T스쿨 계정으로 로그인"
                 onPress={() => setLoginVisible(true)}
-                backgroundColor={theme.colors.primary}
-                textColor={theme.colors.onPrimary}
-                icon={<Ionicons name="log-in-outline" size={18} color={theme.colors.onPrimary} />}
-                style={styles.authButton}
+                backgroundColor="rgba(245, 239, 230, 0.06)"
+                textColor={theme.colors.ivory}
+                icon={<Ionicons name="person-circle-outline" size={20} color={theme.colors.bronze} />}
+                style={styles.loginButton}
               />
-            </View>
+              <Text style={styles.guestHint} lineBreakStrategyIOS="hangul-word">
+                로그인하지 않아도 시즌을 눌러 대학 검색과 합격예측을 체험할 수 있어요.
+              </Text>
+            </>
           )}
-          <AppFooter />
         </View>
-      </View>
 
-      {/* 이메일 로그인 모달 (Hub 계정 공용) */}
-      <Modal visible={loginVisible} transparent animationType="slide">
-        <KeyboardAvoidingView
-          style={styles.modalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>로그인</Text>
-              <TouchableOpacity onPress={() => setLoginVisible(false)} hitSlop={8}>
-                <Ionicons name="close" size={24} color={theme.colors.muted} />
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.modalSubtitle}>
-              거북스쿨(Hub) 계정으로 로그인합니다. 수시·정시앱과 같은 계정을 사용하세요.
-            </Text>
+        <View style={styles.footer}>
+          <AppFooter tone="dark" />
+        </View>
+      </ScrollView>
 
-            <TextInput
-              style={styles.input}
-              placeholder="이메일"
-              autoCapitalize="none"
-              keyboardType="email-address"
-              value={email}
-              onChangeText={setEmail}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="비밀번호"
-              secureTextEntry
-              value={password}
-              onChangeText={setPassword}
-              onSubmitEditing={handleEmailLogin}
-            />
-
+      {/* 이메일 로그인 시트 (Hub 계정 공용) */}
+      <BottomSheet
+        visible={loginVisible}
+        onClose={() => setLoginVisible(false)}
+        title="로그인"
+        subtitle="T스쿨 계정으로 로그인합니다. T수시·T정시와 같은 계정을 사용하세요."
+      >
+        <Field
+          label="이메일"
+          placeholder="name@example.com"
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="email-address"
+          textContentType="emailAddress"
+          autoComplete="email"
+          returnKeyType="next"
+          value={email}
+          onChangeText={setEmail}
+          onSubmitEditing={() => passwordRef.current?.focus()}
+          leading={<Ionicons name="mail-outline" size={18} color={theme.colors.textSubtle} />}
+        />
+        <Field
+          ref={passwordRef}
+          label="비밀번호"
+          placeholder="비밀번호"
+          secureTextEntry={!showPassword}
+          textContentType="password"
+          autoComplete="password"
+          returnKeyType="go"
+          value={password}
+          onChangeText={setPassword}
+          onSubmitEditing={handleEmailLogin}
+          leading={<Ionicons name="lock-closed-outline" size={18} color={theme.colors.textSubtle} />}
+          trailing={
             <TouchableOpacity
-              style={[styles.loginButton, loggingIn && styles.loginButtonDisabled]}
-              onPress={handleEmailLogin}
-              disabled={loggingIn}
+              onPress={() => setShowPassword((v) => !v)}
+              hitSlop={8}
+              style={styles.eyeButton}
+              accessibilityRole="button"
+              accessibilityLabel={showPassword ? '비밀번호 숨기기' : '비밀번호 보기'}
             >
-              {loggingIn ? (
-                <ActivityIndicator color={theme.colors.onPrimary} />
-              ) : (
-                <Text style={styles.loginButtonText}>로그인</Text>
-              )}
+              <Ionicons
+                name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                size={20}
+                color={theme.colors.textMuted}
+              />
             </TouchableOpacity>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+          }
+        />
+        <AuthButton
+          label="로그인"
+          onPress={handleEmailLogin}
+          loading={loggingIn}
+          style={styles.loginSubmit}
+        />
+      </BottomSheet>
     </SafeAreaView>
   );
 }
@@ -279,143 +374,158 @@ export default function MainScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: theme.colors.ink,
   },
-  content: {
-    flex: 1,
-    paddingHorizontal: theme.spacing.lg,
-    justifyContent: 'space-between',
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 20,
+    paddingBottom: theme.spacing.md,
   },
   brandArea: {
     alignItems: 'center',
-    marginTop: theme.spacing.xl,
+    paddingTop: theme.spacing.md,
+    paddingBottom: theme.spacing.xs,
+  },
+  emblemWrap: {
+    width: 104,
+    height: 104,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emblemGlow: {
+    position: 'absolute',
+    top: -58,
+    left: -58,
+  },
+  medallion: {
+    width: 104,
+    height: 104,
+    borderRadius: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.ivory,
+    borderWidth: 3,
+    borderColor: 'rgba(184, 148, 106, 0.55)',
+  },
+  logo: {
+    width: 76,
+    height: 76,
   },
   title: {
-    marginTop: theme.spacing.md,
-    fontSize: theme.typography.title,
+    marginTop: 12,
+    fontSize: theme.typography.display,
     fontWeight: '800',
-    color: theme.colors.text,
+    letterSpacing: theme.tracking.display,
+    color: theme.colors.ivory,
   },
   subtitle: {
-    marginTop: theme.spacing.xs,
-    fontSize: theme.typography.small,
-    color: theme.colors.muted,
+    marginTop: 6,
+    fontSize: 14,
+    fontWeight: '500',
+    color: theme.colors.ivoryMuted,
   },
-  logoBadge: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: theme.colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowOffset: { width: 0, height: 6 },
-    shadowRadius: 12,
-    elevation: 6,
+  section: {
+    marginTop: 22,
   },
-  logoIcon: {
-    // kept for potential future adjustments
+  sectionLabel: {
+    marginBottom: 10,
+    marginLeft: 4,
+    fontSize: 13,
+    fontWeight: '700',
+    color: theme.colors.ivoryMuted,
   },
-  wheelArea: {
-    alignItems: 'stretch',
-    justifyContent: 'center',
+  featuredList: {
+    gap: 12,
   },
-  bottomArea: {
-    paddingBottom: theme.spacing.lg,
+  group: {
+    overflow: 'hidden',
+    borderRadius: 18,
+    backgroundColor: theme.colors.inkRaised,
+    borderWidth: 1,
+    borderColor: theme.colors.inkLine,
   },
-  authButton: {
-    width: '100%',
+  groupDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginLeft: 18,
+    backgroundColor: 'rgba(245, 239, 230, 0.14)',
   },
-  guestHint: {
-    marginBottom: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.sm,
-    textAlign: 'center',
-    fontSize: 12,
-    lineHeight: 17,
-    color: theme.colors.muted,
-  },
-  profileRow: {
+  accountRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.sm,
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radii.md,
-    padding: theme.spacing.md,
-    borderWidth: 1,
-    borderColor: theme.colors.outline,
+    gap: 12,
+    padding: 14,
   },
-  profileName: {
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(184, 148, 106, 0.18)',
+  },
+  avatarText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: theme.colors.bronze,
+  },
+  accountText: {
     flex: 1,
-    fontSize: theme.typography.body,
-    fontWeight: '600',
-    color: theme.colors.text,
+  },
+  accountName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: theme.colors.ivory,
+  },
+  accountEmail: {
+    marginTop: 2,
+    fontSize: 12,
+    color: theme.colors.ivorySubtle,
+  },
+  logoutButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: theme.radii.pill,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 239, 230, 0.18)',
   },
   logoutText: {
-    fontSize: theme.typography.small,
-    color: theme.colors.error,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '700',
+    color: theme.colors.ivoryMuted,
   },
   withdrawButton: {
     alignSelf: 'center',
-    marginTop: theme.spacing.sm,
+    marginTop: 14,
     padding: theme.spacing.xs,
   },
   withdrawText: {
-    fontSize: theme.typography.small,
-    color: theme.colors.muted,
+    fontSize: 12,
+    color: theme.colors.ivorySubtle,
     textDecorationLine: 'underline',
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'flex-end',
-  },
-  modalCard: {
-    backgroundColor: theme.colors.surface,
-    borderTopLeftRadius: theme.radii.lg,
-    borderTopRightRadius: theme.radii.lg,
-    padding: theme.spacing.lg,
-    gap: theme.spacing.sm,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  modalTitle: {
-    fontSize: theme.typography.heading,
-    fontWeight: '700',
-    color: theme.colors.text,
-  },
-  modalSubtitle: {
-    fontSize: theme.typography.small,
-    color: theme.colors.muted,
-    marginBottom: theme.spacing.xs,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: theme.colors.outline,
-    borderRadius: theme.radii.sm,
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: 10,
-    fontSize: theme.typography.body,
-    color: theme.colors.text,
-    backgroundColor: theme.colors.surface,
-  },
   loginButton: {
-    marginTop: theme.spacing.sm,
-    backgroundColor: theme.colors.primary,
-    borderRadius: theme.radii.md,
-    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(184, 148, 106, 0.55)',
+  },
+  guestHint: {
+    marginTop: 12,
+    paddingHorizontal: theme.spacing.md,
+    textAlign: 'center',
+    fontSize: 12,
+    lineHeight: 18,
+    color: theme.colors.ivorySubtle,
+  },
+  footer: {
+    marginTop: 'auto',
+    paddingTop: theme.spacing.lg,
+  },
+  eyeButton: {
+    width: 40,
+    height: 40,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  loginButtonDisabled: {
-    backgroundColor: theme.colors.disabled,
-  },
-  loginButtonText: {
-    color: theme.colors.onPrimary,
-    fontSize: theme.typography.body,
-    fontWeight: '700',
+  loginSubmit: {
+    marginTop: theme.spacing.xs,
   },
 });

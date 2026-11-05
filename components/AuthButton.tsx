@@ -1,6 +1,14 @@
 import React from 'react';
-import { TouchableOpacity, View, Text, StyleSheet, GestureResponderEvent, StyleProp, ViewStyle } from 'react-native';
-import { AntDesign } from '@expo/vector-icons';
+import {
+  Pressable,
+  View,
+  Text,
+  StyleSheet,
+  GestureResponderEvent,
+  StyleProp,
+  ViewStyle,
+  ActivityIndicator,
+} from 'react-native';
 import theme from '../lib/theme';
 
 type AuthButtonProps = {
@@ -10,46 +18,75 @@ type AuthButtonProps = {
   textColor?: string;
   icon?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
+  loading?: boolean;
+  disabled?: boolean;
 };
 
-export default function AuthButton({ label, onPress, backgroundColor, textColor, icon, style }: AuthButtonProps) {
-  const bg = backgroundColor ?? theme.colors.surface;
-  const color = textColor ?? theme.colors.text;
+/** 화면의 주요 동작 버튼 (로그인·제출 등) */
+export default function AuthButton({
+  label,
+  onPress,
+  backgroundColor,
+  textColor,
+  icon,
+  style,
+  loading = false,
+  disabled = false,
+}: AuthButtonProps) {
+  const bg = backgroundColor ?? theme.colors.ink;
+  const color = textColor ?? theme.colors.ivory;
+  const inactive = disabled || loading;
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.8}
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: inactive, busy: loading }}
       onPress={onPress}
-      style={[styles.button, { backgroundColor: bg }, style]}
+      disabled={inactive}
+      style={({ pressed }) => [
+        styles.button,
+        { backgroundColor: bg },
+        inactive && !loading && styles.disabled,
+        pressed && styles.pressed,
+        style,
+      ]}
     >
-      <View style={styles.leftIcon}>{icon ?? <AntDesign name="login" size={18} color={color} />}</View>
-      <Text style={[styles.label, { color }]}>{label}</Text>
-    </TouchableOpacity>
+      {loading ? (
+        <ActivityIndicator color={color} />
+      ) : (
+        <View style={styles.row}>
+          {icon}
+          <Text style={[styles.label, { color }]}>{label}</Text>
+        </View>
+      )}
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   button: {
-    flexDirection: 'row',
+    minHeight: 54,
+    borderRadius: theme.radii.md,
+    paddingHorizontal: theme.spacing.lg,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: theme.spacing.md,
-    paddingHorizontal: theme.spacing.lg,
-    borderRadius: theme.radii.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: theme.colors.outline,
   },
-  leftIcon: {
-    position: 'absolute',
-    left: theme.spacing.lg,
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
   },
   label: {
-    fontSize: theme.typography.body,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: theme.tracking.body,
+  },
+  pressed: {
+    opacity: 0.88,
+    transform: [{ scale: 0.99 }],
+  },
+  disabled: {
+    opacity: 0.4,
   },
 });
