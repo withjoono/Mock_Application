@@ -27,12 +27,26 @@ import { SEASON_LABELS } from '../lib/season-labels';
 
 // 시즌 표시 순서와 카드 문구
 const SEASON_ORDER: MaSeasonType[] = ['SUSI', 'JUNGSI', 'MOCK_SEPT', 'MOCK_JUNE'];
+const GUEST_SEASON_PRIORITY: MaSeasonType[] = ['SUSI', 'JUNGSI', 'MOCK_SEPT', 'MOCK_JUNE'];
 
 const SEASON_COPY: Record<MaSeasonType, { title: string; qualifier?: string; caption: string }> = {
   SUSI: { title: 'T수시', caption: '6개 대학까지 지원하고 실시간 순위 확인' },
   JUNGSI: { title: 'T정시', caption: '수능 성적으로 가·나·다군 모의지원' },
   MOCK_SEPT: { title: 'T정시', qualifier: '9월 모의평가', caption: '9월 모평 성적으로 가·나·다군 모의지원' },
   MOCK_JUNE: { title: 'T정시', qualifier: '6월 모의평가', caption: '6월 모평 성적으로 가·나·다군 모의지원' },
+};
+
+/** 비회원 체험은 열린 시즌을 우선하고, 없으면 입력이 가장 단순한 수시로 안내한다. */
+const pickGuestSeason = (items: IMaSeason[]) => {
+  for (const type of GUEST_SEASON_PRIORITY) {
+    const season = items.find((item) => item.seasonType === type && item.isOpen);
+    if (season) return season;
+  }
+  for (const type of GUEST_SEASON_PRIORITY) {
+    const season = items.find((item) => item.seasonType === type);
+    if (season) return season;
+  }
+  return null;
 };
 
 export default function MainScreen() {
@@ -158,6 +172,23 @@ export default function MainScreen() {
     });
   };
 
+  const handleGuestTrial = async () => {
+    let season = pickGuestSeason(seasons);
+    if (!season) {
+      const loaded = await fetchSeasons(false);
+      season = pickGuestSeason(loaded);
+    }
+    if (!season) {
+      Alert.alert('체험 정보를 불러오지 못했습니다', '네트워크를 확인한 뒤 다시 시도해주세요.');
+      return;
+    }
+    navigation.navigate('SeasonApply', {
+      seasonId: season.id,
+      title: `${season.year}학년도 ${SEASON_LABELS[season.seasonType]}`,
+      seasonType: season.seasonType,
+    });
+  };
+
   // 지금 열린 시즌은 위에 크게, 나머지는 목록으로
   const seasonItems = SEASON_ORDER.map((type) => {
     const season = seasonByType.get(type);
@@ -204,6 +235,36 @@ export default function MainScreen() {
           </Text>
           <Text style={styles.subtitle}>수시·정시 모의지원 합격 예측</Text>
         </View>
+
+        {/* 계정이 없어도 핵심 기능을 바로 이용할 수 있음을 첫 화면에서 명확히 안내 */}
+        {!isAuthenticated && (
+          <View style={styles.guestEntry}>
+            <View style={styles.guestEntryHeading}>
+              <View style={styles.guestEntryIcon}>
+                <Ionicons name="sparkles-outline" size={20} color={theme.colors.bronze} />
+              </View>
+              <View style={styles.guestEntryCopy}>
+                <Text style={styles.guestEntryTitle}>계정 없이 바로 확인하세요</Text>
+                <Text style={styles.guestEntryText} lineBreakStrategyIOS="hangul-word">
+                  대학 검색부터 내 점수 기준 합격예측까지 회원가입 없이 이용할 수 있어요.
+                </Text>
+              </View>
+            </View>
+            <AuthButton
+              label="로그인 없이 합격예측 체험하기"
+              onPress={handleGuestTrial}
+              loading={isLoading && seasons.length === 0}
+              backgroundColor={theme.colors.bronze}
+              textColor={theme.colors.ink}
+              icon={<Ionicons name="arrow-forward-circle" size={21} color={theme.colors.ink} />}
+              style={styles.guestEntryButton}
+            />
+            <View style={styles.guestPrivacyRow}>
+              <Ionicons name="shield-checkmark-outline" size={15} color={theme.colors.positiveOnDark} />
+              <Text style={styles.guestPrivacyText}>체험 점수와 결과는 계정이나 서버에 저장되지 않습니다.</Text>
+            </View>
+          </View>
+        )}
 
         {/* 지금 지원할 수 있는 시즌 */}
         {openItems.length > 0 && (
@@ -300,7 +361,7 @@ export default function MainScreen() {
                 style={styles.loginButton}
               />
               <Text style={styles.guestHint} lineBreakStrategyIOS="hangul-word">
-                로그인하지 않아도 시즌을 눌러 대학 검색과 합격예측을 체험할 수 있어요.
+                로그인은 모의지원 저장·취소와 내 지원내역 관리에만 필요합니다.
               </Text>
             </>
           )}
@@ -426,6 +487,57 @@ const styles = StyleSheet.create({
   },
   section: {
     marginTop: 22,
+  },
+  guestEntry: {
+    marginTop: 22,
+    padding: 18,
+    borderRadius: theme.radii.lg,
+    backgroundColor: theme.colors.inkRaised,
+    borderWidth: 1,
+    borderColor: 'rgba(184, 148, 106, 0.58)',
+  },
+  guestEntryHeading: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  guestEntryIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(184, 148, 106, 0.16)',
+  },
+  guestEntryCopy: {
+    flex: 1,
+  },
+  guestEntryTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: theme.colors.ivory,
+  },
+  guestEntryText: {
+    marginTop: 5,
+    fontSize: 13,
+    lineHeight: 19,
+    color: theme.colors.ivoryMuted,
+  },
+  guestEntryButton: {
+    marginTop: 16,
+  },
+  guestPrivacyRow: {
+    marginTop: 11,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  guestPrivacyText: {
+    flexShrink: 1,
+    fontSize: 11,
+    lineHeight: 16,
+    color: theme.colors.ivorySubtle,
   },
   sectionLabel: {
     marginBottom: 10,
